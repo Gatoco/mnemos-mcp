@@ -1,7 +1,7 @@
 # NotaRAG — Servidor MCP de RAG para opencode
 
-> **Proyecto Integrado** — Nombre del ramo: **_[completar nombre del ramo]_** · Profesor: **Christian Pérez**
-> **Alumno**: [tu nombre]
+> **Proyecto Integrado** — Nombre del ramo: **Proyecto Integrado** · Profesor: **Christian Pérez**
+> **Alumno**: Gat
 > **Fecha**: 2026-08-21
 
 `#RAG` `#MCP` `#opencode` `#Obsidian` `#Qdrant` `#Ollama` `#DeepSeek` `#ProyectoIntegrado` `#InteligenciaArtificial` `#Python`
@@ -200,5 +200,5 @@ no lo tiene."
 
 ---
 
-*Proyecto académico — ramo con Prof. Christian Pérez. Repositorio:
+*Proyecto académico — Proyecto Integrado con Prof. Christian Pérez. Repositorio:
 `~/proyectos_github/mcp-rag-opencode`.*
