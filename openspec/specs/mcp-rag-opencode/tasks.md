@@ -6,8 +6,8 @@ Sequential, small phases for sdd-apply. Each task is independently verifiable of
 
 | ID | Title | Depends on | Key REQ | Verify |
 |----|-------|-----------|---------|--------|
-| T0 | Bootstrap | — | CONF-001, DOC-001 | `python -m build` / `make install` |
-| T1 | Config + dataclasses | T0 | CONF-001 | `pytest tests/test_config.py -q` |
+| T0 | Bootstrap | — | CONF-001, DOC-001 | `python -m build` / `make install` | ✅ |
+| T1 | Config + dataclasses | T0 | CONF-001 | `pytest tests/test_config.py -q` | ✅ |
 | T2 | Chunker | T1 | CHUNK-001, CHUNK-002 | `pytest tests/test_chunker.py -q` |
 | T3 | QdrantStore | T1 | QDR-001, QDR-002 | `pytest tests/test_qdrant.py -q` |
 | T4 | Embedder | T1 | EMB-001, EMB-002 | `pytest tests/test_embed.py -q` |
@@ -21,7 +21,7 @@ Sequential, small phases for sdd-apply. Each task is independently verifiable of
 
 ---
 
-## T0 — Bootstrap
+## T0 — Bootstrap ✅
 
 **Goal:** Repo skeleton, packaging, deps, env template, docker, make, gitignore, README stub.
 
@@ -45,7 +45,7 @@ Sequential, small phases for sdd-apply. Each task is independently verifiable of
 
 ---
 
-## T1 — Config + dataclasses
+## T1 — Config + dataclasses ✅
 
 **Goal:** `AppConfig` dataclass + precedence load/save.
 
