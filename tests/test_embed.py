@@ -4,7 +4,7 @@ import httpx
 import pytest
 
 from mcp_rag.config import AppConfig
-from mcp_rag.embed import OllamaEmbedder, MODEL_NOT_FOUND
+from mcp_rag.embed import OllamaEmbedder, MODEL_NOT_FOUND, _l2_normalize
 from mcp_rag.errors import RagError
 
 
@@ -74,3 +74,21 @@ def test_health_404_returns_model_not_found():
     ok, msg = emb.health()
     assert ok is False
     assert msg == MODEL_NOT_FOUND
+
+
+def test_embed_vectors_are_l2_normalized():
+    def handler(request):
+        n = len(json.loads(request.content)["input"])
+        # Vectors deliberately not unit-length (bge-m3 raw output).
+        return httpx.Response(200, json={"embeddings": [[3.0, 4.0] + [0.0] * 1022] * n})
+
+    emb = _embedder(handler)
+    vectors = emb.embed(["x"])
+    v = vectors[0]
+    assert v[0] == pytest.approx(0.6) and v[1] == pytest.approx(0.8)
+    norm = sum(x * x for x in v) ** 0.5
+    assert norm == pytest.approx(1.0)
+
+
+def test_l2_normalize_zero_vector_unchanged():
+    assert _l2_normalize([0.0, 0.0]) == [0.0, 0.0]

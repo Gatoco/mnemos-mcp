@@ -1,6 +1,7 @@
 """Ollama embedding provider via `/api/embed` (bge-m3, 1024 dims)."""
 from __future__ import annotations
 
+import math
 import time
 
 import httpx
@@ -14,6 +15,19 @@ RETRIES = 3
 BACKOFF = (1, 2, 4)  # seconds
 
 MODEL_NOT_FOUND = "model not found, run: ollama pull bge-m3"
+
+
+def _l2_normalize(vector: list[float]) -> list[float]:
+    """L2-normalize (bge-m3 returns unnormalized vectors).
+
+    Cosine over unnormalized vectors saturates around 0.45-0.5; with
+    normalized vectors cosine == dot product, restoring the ~0.6-0.9 scale
+    and making score_threshold usable.
+    """
+    norm = math.sqrt(sum(x * x for x in vector))
+    if norm == 0:
+        return vector
+    return [x / norm for x in vector]
 
 
 class OllamaEmbedder:
@@ -45,7 +59,7 @@ class OllamaEmbedder:
                     raise RagError(MODEL_NOT_FOUND)
                 resp.raise_for_status()
                 data = resp.json()
-                return [list(v) for v in data["embeddings"]]
+                return [_l2_normalize(list(v)) for v in data["embeddings"]]
             except RagError:
                 raise
             except Exception as exc:  # noqa: BLE001 - retry transient failures
