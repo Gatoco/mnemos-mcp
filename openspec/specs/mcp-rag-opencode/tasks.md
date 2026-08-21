@@ -13,7 +13,7 @@ Sequential, small phases for sdd-apply. Each task is independently verifiable of
 | T4 | Embedder | T1 | EMB-001, EMB-002 | `pytest tests/test_embed.py -q` | ✅ |
 | T5 | LLM provider | T1 | LLM-001 | `pytest tests/test_llm.py -q` | ✅ |
 | T6 | Indexer | T2, T3, T4 | IDX-001, CHUNK-002 | `pytest tests/test_indexer.py -q` | ✅ |
-| T7 | Core | T2, T3, T4, T5, T6 | ADMIN-002, MCP-002..008 | `pytest tests/test_core.py -q` |
+| T7 | Core | T2, T3, T4, T5, T6 | ADMIN-002, MCP-002..008 | `pytest tests/test_core.py -q` | ✅ |
 | T8 | MCP server | T7 | MCP-001..008 | `pytest tests/test_tools.py -q` |
 | T9 | Admin page | T7 | ADMIN-001, ADMIN-003 | `pytest tests/test_admin.py -q` |
 | T10 | Integration + docs | T8, T9 | TEST-001, DOC-001 | `pytest -q` (offline) |
@@ -183,7 +183,7 @@ Sequential, small phases for sdd-apply. Each task is independently verifiable of
 
 ---
 
-## T7 — Core
+## T7 — Core ✅
 
 **Goal:** shared core layer used by BOTH MCP and admin (ADMIN-002).
 
