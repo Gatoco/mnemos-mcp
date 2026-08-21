@@ -1,4 +1,4 @@
-# NotaRAG — Servidor MCP de RAG para opencode
+# Mnē-MCP — Servidor MCP de RAG para opencode
 
 > **Proyecto Integrado** — Nombre del ramo: **Proyecto Integrado** · Profesor: **Christian Pérez**
 > **Alumno**: Gat
@@ -10,12 +10,12 @@
 
 ## 1. ¿Qué es este proyecto?
 
-**NotaRAG** es un servidor que implementa un sistema de **RAG** (Retrieval-Augmented
+**Mnē-MCP** es un servidor que implementa un sistema de **RAG** (Retrieval-Augmented
 Generation, generación aumentada por recuperación) y lo expone como un
 **servidor MCP** para que el asistente de código **opencode** lo use como una
 herramienta más.
 
-En términos simples: NotaRAG toma las notas que tengo en mi vault de Obsidian
+En términos simples: Mnē-MCP toma las notas que tengo en mi vault de Obsidian
 (y cualquier carpeta de documentos), las indexa en una base de datos vectorial
 llamada Qdrant, y cuando el asistente necesita responder una pregunta sobre mi
 propio conocimiento, primero **busca** en mis notas los fragmentos más
@@ -37,7 +37,7 @@ forma de conectarse con bases de datos, archivos o servicios, MCP define un
 protocolo común sobre el cual cualquier asistente compatible puede usar
 cualquier herramienta compatible.
 
-En este proyecto, opencode (el asistente) actúa como "cliente" y NotaRAG como
+En este proyecto, opencode (el asistente) actúa como "cliente" y Mnē-MCP como
 "servidor" de herramientas. El servidor se comunica con el asistente por
 stdin/stdout (protocolo stdio), y expone herramientas con nombre, parámetros
 y resultados tipados. Esto hace que el asistente pueda, de forma autónoma
@@ -52,7 +52,7 @@ orquestación y una interfaz de uso real — en lugar de una demo de
 
 ## 3. Funcionalidades y justificación
 
-NotaRAG expone **7 herramientas** (cada una está justificada por un problema
+Mnē-MCP expone **7 herramientas** (cada una está justificada por un problema
 real que resuelve):
 
 ### `index` — Construir la base de conocimiento
@@ -110,7 +110,7 @@ base de datos vectorial en crudo.
 
 1. **El conocimiento personal está disperso**: una vault de Obsidian con
    cientos de notas no se puede buscar de forma semántica con herramientas
-   clásicas (grep). NotaRAG permite preguntarle al asistente cosas como
+   clásicas (grep). Mnē-MCP permite preguntarle al asistente cosas como
    "¿cómo configuré el servidor?", incluso si las notas no comparten palabras
    exactas con la pregunta — eso es justo lo que hacen los embeddings
    semánticos.
@@ -134,7 +134,7 @@ base de datos vectorial en crudo.
 El ciclo de vida tiene dos momentos:
 
 **1. Fase de indexado (construcción del conocimiento):**
-NotaRAG camina la carpeta raíz, filtra los archivos válidos (.md, .txt) y
+Mnē-MCP camina la carpeta raíz, filtra los archivos válidos (.md, .txt) y
 descarta los que superan un límite de tamaño. Por cada archivo, calcula la
 fecha de modificación: si no cambió desde el último indexado, lo saltea
 directamente (optimización incremental). Si cambió, divide el documento en
@@ -197,6 +197,48 @@ nube porque es donde está la calidad del modelo.
 "Le preguntás al asistente cualquier cosa sobre tu vida de proyectos,
 y te responde citando exactamente la nota de dónde lo sacó — o te dice que
 no lo tiene."
+
+## 9. Comparativa con proyectos similares
+
+Existen otros servidores MCP de RAG y búsqueda semántica. Esta sección
+documenta la comparación (investigación de agosto 2026) y qué hace a Mnē-MCP
+distinto.
+
+### Tabla comparativa
+
+| Proyecto | Stack | Tools | Embeddings | Indexado de disco | Admin UI | Generación con LLM |
+|---|---|---|---|---|---|---|
+| **Mnē-MCP (este proyecto)** | Python, FastMCP | 7 | bge-m3 local (Ollama) | Sí (incremental mtime+md5, 19 GB) | **Sí, completa (Dashboard/Documents/Index/Search)** | **Sí, con rechazo si no hay evidencia** |
+| ximot/knowledge-mcp | Python, FastMCP | 24 | nomic-embed-text | No (entradas manuales) | Parcial (stub) | No (solo recuperación) |
+| qdrant/mcp-server-qdrant (oficial) | Python, FastMCP | 2 | fastembed | No | No | No |
+| ancoleman/qdrant-rag-mcp | Python | ~40 | por tipo de contenido | Sí (mtime) | No | No (genera Claude) |
+| doitmagic/rag-code-mcp | Go | 9 | mxbai-embed-large | Sí (al primer query) | No | No |
+| weverkley/qdrant-mcp-server | Go | 1 | nomic-embed-text | Sí (fsnotify) | No | No |
+| w3-mcp-server-qdrant | Python | 2 | bge-m3 | No | No | No |
+| rageval-mcp | Python | 5 | — | No (carga corpus etiquetado) | No | No (eval-only) |
+
+### Qué diferencia a Mnē-MCP
+
+1. **Respuestas fundamentadas con rechazo**: Mnē-MCP genera la respuesta
+   **en el servidor** con un umbral de evidencia — si no hay fragmentos
+   suficientemente relevantes, **dice que no encontró** en vez de inventar.
+   Ninguno de los proyectos comparados genera respuestas del lado del
+   servidor: delegan la generación al cliente (el LLM del asistente).
+2. **Citas a nivel de fragmento con ruta de encabezados**: cada respuesta
+   viene acompañada de la ruta de la nota y la jerarquía de secciones
+   (heading_path), verificable en el vault.
+3. **Indexado incremental de carpetas reales**: escanea el vault desde
+   disco con mtime+md5, stale cleanup y manejo de volúmenes grandes (19 GB),
+   sin requerir entrada manual de documentos.
+4. **Página de administración local**: control visual del RAG (estado,
+   documentos, indexado asíncrono, playground de búsqueda) que ninguno de
+   los competidores ofrece de forma completa.
+5. **Umbral de relevancia configurable en caliente**: ajuste de calidad de
+   respuestas sin tocar código (score_threshold, top_k).
+
+**En desarrollo (features planificadas)**: búsqueda híbrida densa+dispersa
+(BM25 + fusión RRF), cross-encoder reranking, caché semántica y harness de
+evaluación de recuperación integrado (recall@k / MRR / nDCG).
 
 ---
 
