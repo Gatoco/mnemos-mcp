@@ -12,7 +12,7 @@ Sequential, small phases for sdd-apply. Each task is independently verifiable of
 | T3 | QdrantStore | T1 | QDR-001, QDR-002 | `pytest tests/test_qdrant.py -q` | ✅ |
 | T4 | Embedder | T1 | EMB-001, EMB-002 | `pytest tests/test_embed.py -q` | ✅ |
 | T5 | LLM provider | T1 | LLM-001 | `pytest tests/test_llm.py -q` | ✅ |
-| T6 | Indexer | T2, T3, T4 | IDX-001, CHUNK-002 | `pytest tests/test_indexer.py -q` |
+| T6 | Indexer | T2, T3, T4 | IDX-001, CHUNK-002 | `pytest tests/test_indexer.py -q` | ✅ |
 | T7 | Core | T2, T3, T4, T5, T6 | ADMIN-002, MCP-002..008 | `pytest tests/test_core.py -q` |
 | T8 | MCP server | T7 | MCP-001..008 | `pytest tests/test_tools.py -q` |
 | T9 | Admin page | T7 | ADMIN-001, ADMIN-003 | `pytest tests/test_admin.py -q` |
@@ -158,7 +158,7 @@ Sequential, small phases for sdd-apply. Each task is independently verifiable of
 
 ---
 
-## T6 — Indexer
+## T6 — Indexer ✅
 
 **Goal:** incremental scan with mtime+md5 skip, batch upsert, stale delete, progress.
 
