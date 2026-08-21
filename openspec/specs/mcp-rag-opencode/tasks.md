@@ -8,10 +8,10 @@ Sequential, small phases for sdd-apply. Each task is independently verifiable of
 |----|-------|-----------|---------|--------|
 | T0 | Bootstrap | — | CONF-001, DOC-001 | `python -m build` / `make install` | ✅ |
 | T1 | Config + dataclasses | T0 | CONF-001 | `pytest tests/test_config.py -q` | ✅ |
-| T2 | Chunker | T1 | CHUNK-001, CHUNK-002 | `pytest tests/test_chunker.py -q` |
-| T3 | QdrantStore | T1 | QDR-001, QDR-002 | `pytest tests/test_qdrant.py -q` |
-| T4 | Embedder | T1 | EMB-001, EMB-002 | `pytest tests/test_embed.py -q` |
-| T5 | LLM provider | T1 | LLM-001 | `pytest tests/test_llm.py -q` |
+| T2 | Chunker | T1 | CHUNK-001, CHUNK-002 | `pytest tests/test_chunker.py -q` | ✅ |
+| T3 | QdrantStore | T1 | QDR-001, QDR-002 | `pytest tests/test_qdrant.py -q` | ✅ |
+| T4 | Embedder | T1 | EMB-001, EMB-002 | `pytest tests/test_embed.py -q` | ✅ |
+| T5 | LLM provider | T1 | LLM-001 | `pytest tests/test_llm.py -q` | ✅ |
 | T6 | Indexer | T2, T3, T4 | IDX-001, CHUNK-002 | `pytest tests/test_indexer.py -q` |
 | T7 | Core | T2, T3, T4, T5, T6 | ADMIN-002, MCP-002..008 | `pytest tests/test_core.py -q` |
 | T8 | MCP server | T7 | MCP-001..008 | `pytest tests/test_tools.py -q` |
@@ -65,7 +65,7 @@ Sequential, small phases for sdd-apply. Each task is independently verifiable of
 
 ---
 
-## T2 — Chunker
+## T2 — Chunker ✅
 
 **Goal:** stdlib heading-aware chunker.
 
@@ -89,7 +89,7 @@ Sequential, small phases for sdd-apply. Each task is independently verifiable of
 
 ---
 
-## T3 — QdrantStore
+## T3 — QdrantStore ✅
 
 **Goal:** Qdrant collection mgmt + CRUD + search + stats + health, `:memory:` support.
 
@@ -115,7 +115,7 @@ Sequential, small phases for sdd-apply. Each task is independently verifiable of
 
 ---
 
-## T4 — Embedder
+## T4 — Embedder ✅
 
 **Goal:** `OllamaEmbedder` via `/api/embed`.
 
@@ -136,7 +136,7 @@ Sequential, small phases for sdd-apply. Each task is independently verifiable of
 
 ---
 
-## T5 — LLM provider
+## T5 — LLM provider ✅
 
 **Goal:** `LLMProvider` OpenAI-compatible chat.
 
