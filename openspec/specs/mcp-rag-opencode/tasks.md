@@ -16,7 +16,7 @@ Sequential, small phases for sdd-apply. Each task is independently verifiable of
 | T7 | Core | T2, T3, T4, T5, T6 | ADMIN-002, MCP-002..008 | `pytest tests/test_core.py -q` | ✅ |
 | T8 | MCP server | T7 | MCP-001..008 | `pytest tests/test_tools.py -q` | ✅ |
 | T9 | Admin page | T7 | ADMIN-001, ADMIN-003 | `pytest tests/test_admin.py -q` | ✅ |
-| T10 | Integration + docs | T8, T9 | TEST-001, DOC-001 | `pytest -q` (offline) |
+| T10 | Integration + docs | T8, T9 | TEST-001, DOC-001 | `pytest -q` (offline) | ✅ |
 | T11 | (stretch) .pdf v2 | — | — | not in scope |
 
 ---
@@ -256,18 +256,19 @@ Sequential, small phases for sdd-apply. Each task is independently verifiable of
 
 ---
 
-## T10 — Integration + docs
+## T10 — Integration + docs ✅
 
 **Goal:** end-to-end smoke + Spanish README + full offline suite green.
 
-**Files:** `README.md` (full), `scripts/smoke.py` (or `tests/test_smoke.py`), final pass over all tests.
+**Files:** `README.md` (full), `scripts/smoke.py`, final pass over all tests.
 
 **Details:**
-- End-to-end smoke: index tiny sample → search → query with FakeLLM (offline).
-- `README.md` (Spanish, DOC-001): setup (`docker compose up qdrant`, `ollama pull bge-m3`, `.env`, register in `opencode.json`, `make install`), usage (index/query via opencode, admin page), ASCII architecture diagram, troubleshooting.
-- Final check: `pytest -q` all green offline (TEST-001). Note manual `mcp dev` for protocol testing.
+- `scripts/smoke.py`: offline end-to-end — RagService with FakeEmbedder (deterministic 1024-dim) + FakeLLM + real QdrantStore (`QdrantClient(":memory:")`) + real Chunker + real Indexer. Creates a tmp dir with 3 sample files (one with frontmatter + nested headings). Asserts files_scanned=3, files_indexed=3, chunks_upserted>0, errors=[], search_vec hits, query_rag answer+sources. Prints `[PASS]` per stage, exits 0/1. Self-contained (no test imports). Runnable via `make smoke`.
+- `README.md` (Spanish, DOC-001, replaced the stub): requisitos, instalación (make install, .env, docker compose up -d qdrant, ollama pull bge-m3, registro en opencode.json con snippet exacto), uso de las 7 tools con ejemplos de prompt, admin page (make admin → :8310, pestañas, enlace a Qdrant dashboard), arquitectura (diagrama ASCII), troubleshooting, tests, nota de privacidad.
+- `Makefile`: added `smoke` target (`python scripts/smoke.py`), `.PHONY` updated.
+- Final pass: `.venv/bin/pytest -q` → 68 passed offline. `.venv/bin/python scripts/smoke.py` → SMOKE-ALL-PASS, exit 0.
 
-**Verification:** `pytest -q` (offline, all green).
+**Verification:** `pytest -q` (offline, all green) — 68 passed.
 
 **Depends on:** T8, T9.
 
