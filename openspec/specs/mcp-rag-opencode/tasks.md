@@ -14,8 +14,8 @@ Sequential, small phases for sdd-apply. Each task is independently verifiable of
 | T5 | LLM provider | T1 | LLM-001 | `pytest tests/test_llm.py -q` | ✅ |
 | T6 | Indexer | T2, T3, T4 | IDX-001, CHUNK-002 | `pytest tests/test_indexer.py -q` | ✅ |
 | T7 | Core | T2, T3, T4, T5, T6 | ADMIN-002, MCP-002..008 | `pytest tests/test_core.py -q` | ✅ |
-| T8 | MCP server | T7 | MCP-001..008 | `pytest tests/test_tools.py -q` |
-| T9 | Admin page | T7 | ADMIN-001, ADMIN-003 | `pytest tests/test_admin.py -q` |
+| T8 | MCP server | T7 | MCP-001..008 | `pytest tests/test_tools.py -q` | ✅ |
+| T9 | Admin page | T7 | ADMIN-001, ADMIN-003 | `pytest tests/test_admin.py -q` | ✅ |
 | T10 | Integration + docs | T8, T9 | TEST-001, DOC-001 | `pytest -q` (offline) |
 | T11 | (stretch) .pdf v2 | — | — | not in scope |
 
@@ -205,7 +205,7 @@ Sequential, small phases for sdd-apply. Each task is independently verifiable of
 
 ---
 
-## T8 — MCP server
+## T8 — MCP server ✅
 
 **Goal:** FastMCP app with 7 tools + progress + error mapping.
 
@@ -232,7 +232,7 @@ Sequential, small phases for sdd-apply. Each task is independently verifiable of
 
 ---
 
-## T9 — Admin page
+## T9 — Admin page ✅
 
 **Goal:** stdlib HTTP admin server + vanilla-JS page + async jobs.
 

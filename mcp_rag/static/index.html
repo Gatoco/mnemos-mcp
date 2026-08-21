@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mcp-rag admin</title>
+<style>
+  :root { --bg:#111; --fg:#ddd; --accent:#4caf50; --muted:#888; --card:#1b1b1b; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+  header { padding: 16px 24px; border-bottom: 1px solid #333; display:flex; align-items:center; gap:24px; }
+  header h1 { font-size: 18px; margin:0; }
+  nav button { background:none; border:none; color:var(--fg); padding:8px 12px; cursor:pointer; font-size:14px; }
+  nav button.active { color:var(--accent); border-bottom:2px solid var(--accent); }
+  main { padding: 24px; max-width: 1000px; margin: 0 auto; }
+  .card { background: var(--card); border:1px solid #333; border-radius:8px; padding:16px; margin-bottom:16px; }
+  h2 { font-size:16px; margin:0 0 12px; }
+  table { width:100%; border-collapse: collapse; font-size:13px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid #2a2a2a; }
+  th { color: var(--muted); font-weight:600; }
+  input, select { background:#222; color:var(--fg); border:1px solid #444; border-radius:4px; padding:6px 8px; }
+  button { background:var(--accent); color:#111; border:none; border-radius:4px; padding:8px 14px; cursor:pointer; font-weight:600; }
+  button.ghost { background:transparent; color:var(--fg); border:1px solid #444; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:12px; }
+  .ok { background:#1b5e20; color:#a5d6a7; }
+  .down { background:#7f1d1d; color:#ef9a9a; }
+  .muted { color: var(--muted); font-size:12px; }
+  .bar { background:#222; height:10px; border-radius:5px; overflow:hidden; margin-top:8px; }
+  .bar > div { height:100%; background:var(--accent); width:0%; }
+  .err { color:#ef9a9a; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fill,minmax(180px,1fr)); gap:12px; }
+  .kpi { background:var(--card); border:1px solid #333; border-radius:8px; padding:12px; }
+  .kpi b { display:block; font-size:20px; }
+  .logs { background:#0a0a0a; border:1px solid #333; border-radius:6px; padding:10px; font-family:monospace; font-size:12px; min-height:60px; white-space:pre-wrap; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+  .snippet { color:#bbb; font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>mcp-rag</h1>
+  <nav>
+    <button data-tab="dashboard" class="active">Dashboard</button>
+    <button data-tab="documents">Documents</button>
+    <button data-tab="index">Index</button>
+    <button data-tab="search">Search</button>
+  </nav>
+</header>
+<main>
+  <section id="tab-dashboard">
+    <div class="card">
+      <h2>Stats</h2>
+      <div id="kpis" class="grid"></div>
+      <div class="row" style="margin-top:12px">
+        <span>Qdrant <span id="b-qdrant" class="badge down">?</span></span>
+        <span>Ollama <span id="b-ollama" class="badge down">?</span></span>
+        <span>LLM <span id="b-llm" class="badge down">?</span></span>
+        <span>Admin <span id="b-admin" class="badge ok">ok</span></span>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-documents" style="display:none">
+    <div class="card">
+      <div class="row">
+        <h2>Documents</h2>
+      </div>
+      <div class="row">
+        <input id="doc-source" placeholder="source (vacío = todos)">
+        <button class="ghost" onclick="loadDocs(0)">Filtrar</button>
+        <button class="ghost" onclick="deleteBySource()">Eliminar por source</button>
+      </div>
+      <table>
+        <thead><tr><th>Path</th><th>Chunks</th><th>Last indexed</th><th></th></tr></thead>
+        <tbody id="doc-body"></tbody>
+      </table>
+      <div class="row">
+        <button class="ghost" onclick="prevPage()">← prev</button>
+        <span id="doc-page" class="muted">página 0</span>
+        <button class="ghost" onclick="nextPage()">next →</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-index" style="display:none">
+    <div class="card">
+      <h2>Indexar vault</h2>
+      <div class="row">
+        <input id="ix-source" placeholder="source (vacío = default)">
+        <input id="ix-path" placeholder="sub-path (vacío = raíz)">
+        <label><input id="ix-force" type="checkbox"> force rescan</label>
+        <button onclick="startIndex()">Indexar</button>
+      </div>
+      <div class="bar"><div id="ix-bar"></div></div>
+      <div class="muted" id="ix-status">sin job</div>
+      <h2 style="margin-top:16px">Log</h2>
+      <div class="logs" id="ix-log">—</div>
+    </div>
+  </section>
+
+  <section id="tab-search" style="display:none">
+    <div class="card">
+      <h2>Search playground</h2>
+      <div class="row">
+        <input id="q-text" placeholder="texto a buscar" style="flex:1">
+        <input id="q-topk" type="number" value="5" style="width:70px">
+        <input id="q-thr" type="number" step="0.01" value="0.0" style="width:80px" placeholder="threshold">
+        <button onclick="doSearch()">Buscar</button>
+      </div>
+      <div id="q-results"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const tabs = document.querySelectorAll('nav button');
+tabs.forEach(b => b.onclick = () => {
+  tabs.forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  document.querySelectorAll('main section').forEach(s => s.style.display = 'none');
+  $('#tab-' + b.dataset.tab).style.display = '';
+});
+let page = 0;
+const PAGE = 20;
+let pollTimer = null;
+
+async function api(url, opts) {
+  const r = await fetch(url, opts);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || r.status);
+  return data;
+}
+async function loadStats() {
+  try {
+    const s = await api('/api/stats');
+    $('#kpis').innerHTML =
+      '<div class="kpi"><b>'+s.vectors_count+'</b>vectores</div>' +
+      '<div class="kpi"><b>'+s.sources.length+'</b>sources</div>' +
+      (s.last_index_at ? '<div class="kpi"><b>'+new Date(s.last_index_at*1000).toLocaleString()+'</b>último index</div>' : '');
+    setBadge('b-qdrant', s.qdrant_health && s.qdrant_health[0]);
+    setBadge('b-ollama', s.ollama_health && s.ollama_health[0]);
+    setBadge('b-llm', !!s.llm_configured);
+  } catch (e) { /* health badges stay */ }
+}
+function setBadge(id, ok) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = ok ? 'ok' : 'down';
+  el.className = 'badge ' + (ok ? 'ok' : 'down');
+}
+async function loadDocs() {
+  const src = $('#doc-source').value;
+  const q = new URLSearchParams({limit: PAGE, offset: page*PAGE});
+  if (src) q.set('source', src);
+  try {
+    const docs = await api('/api/documents?' + q);
+    $('#doc-page').textContent = 'page ' + page;
+    $('#doc-body').innerHTML = docs.map(d =>
+      '<tr><td>'+esc(d.path)+'</td><td>'+d.chunks+'</td><td>'+d.last_indexed+
+      '</td><td><button class="ghost" onclick="delPath(\''+escAttr(d.path)+'\')">del</button></td></tr>'
+    ).join('') || '<tr><td colspan="4" class="muted">sin documentos</td></tr>';
+  } catch (e) { alert(e.message); }
+}
+function esc(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escAttr(s){ return esc(s).replace(/'/g, '&#39;'); }
+function prevPage(){ if(page>0){page--; loadDocs();} }
+function nextPage(){ page++; loadDocs(); }
+async function deletePath(p){ if(confirm('¿Eliminar '+p+'?')){ await api('/api/documents',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:p})}); loadDocs(); loadStats(); } }
+async function deleteBySource(){ const src=$('#doc-source').value; if(!src){alert('escribe un source');return;} if(confirm('¿Eliminar todos los docs del source '+src+'?')){ await api('/api/documents',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:src})}); loadDocs(); loadStats(); } }
+async function startIndex(){
+  clearInterval(pollTimer);
+  $('#ix-bar').style.width='0%';
+  $('#ix-log').textContent='—';
+  const body = {};
+  if ($('#ix-source').value) body.source = $('#ix-source').value;
+  if ($('#ix-path').value) body.path = $('#ix-path').value;
+  body.force_rescan = $('#ix-force').checked;
+  try {
+    const {job_id} = await api('/api/index', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    $('#ix-status').textContent = 'job ' + job_id;
+    pollTimer = setInterval(()=>pollJob(job_id), 2000);
+  } catch (e) { $('#ix-status').textContent = e.message; }
+}
+async function pollJob(id){
+  try {
+    const j = await api('/api/jobs/'+id);
+    $('#ix-bar').style.width = Math.round(j.progress*100)+'%';
+    if (j.status === 'done') {
+      clearInterval(pollTimer);
+      $('#ix-status').textContent = 'listo';
+      $('#ix-log').textContent = JSON.stringify(j.result, null, 2);
+      loadStats(); loadDocs();
+    } else if (j.status === 'error') {
+      clearInterval(pollTimer);
+      $('#ix-status').textContent = 'error';
+      $('#ix-log').textContent = j.error;
+    }
+  } catch (e) { $('#ix-status').textContent = e.message; }
+}
+async function doSearch(){
+  const q = new URLSearchParams({text: $('#q-text').value, top_k: $('#q-topk').value || '5'});
+  const thr = parseFloat($('#q-thr').value);
+  if (thr) q.set('score_threshold', thr);
+  try {
+    const hits = await api('/api/search?'+q);
+    $('#q-results').innerHTML = hits.length ? hits.map(h =>
+      '<div class="card"><b>'+esc(h.path)+'</b> <span class="muted">score '+h.score.toFixed(3)+'</span>'+
+      '<div class="muted">'+esc(h.heading_path)+'</div>'+
+      '<div class="snippet">'+esc(h.snippet)+'</div></div>').join('')
+      : '<div class="muted">sin resultados</div>';
+  } catch(e){ $('#q-results').innerHTML = '<span class="err">'+esc(e.message)+'</span>'; }
+}
+loadStats(); loadDocs();
+</script>
+</body>
+</html>
