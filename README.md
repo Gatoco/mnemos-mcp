@@ -1,246 +1,56 @@
-# Mnē-MCP — Servidor MCP de RAG para opencode
+# ⚡ Mnē-MCP — Memoria semántica para opencode
 
-> **Proyecto Integrado** — Nombre del ramo: **Proyecto Integrado** · Profesor: **Christian Pérez**
-> **Alumno**: Gat
-> **Fecha**: 2026-08-21
+**Mnē-MCP** (de *Mnemosyne*, la titánide griega de la memoria) es un **servidor MCP de RAG completo** para [opencode](https://opencode.ai): indexa tu vault de **Obsidian** y carpetas de documentos, y le permite al asistente responder preguntas **usando tus propias notas como fuente**, citando la ruta exacta de cada afirmación.
 
-`#RAG` `#MCP` `#opencode` `#Obsidian` `#Qdrant` `#Ollama` `#DeepSeek` `#ProyectoIntegrado` `#InteligenciaArtificial` `#Python`
+`#RAG` `#MCP` `#opencode` `#Obsidian` `#Qdrant` `#Ollama` `#DeepSeek` `#bge-m3` `#Python` `#ProyectoIntegrado`
 
 ---
 
-## 1. ¿Qué es este proyecto?
+## ▸ Qué hace
 
-**Mnē-MCP** es un servidor que implementa un sistema de **RAG** (Retrieval-Augmented
-Generation, generación aumentada por recuperación) y lo expone como un
-**servidor MCP** para que el asistente de código **opencode** lo use como una
-herramienta más.
+1. **Indexa** carpetas reales (`.md`, `.txt`) desde disco — incremental (mtime+md5), limpieza de archivos eliminados, maneja volúmenes grandes (19 GB).
+2. **Embede** con `bge-m3` vía Ollama **local**: 1024 dimensiones, multilingüe (clave para notas en español).
+3. **Recupera** por similitud semántica desde **Qdrant** (Docker), con filtros por fuente/ruta y umbral de relevancia.
+4. **Responde** con `deepseek-v4-flash` (Ollama Cloud) **solo si hay evidencia**: si no encuentra contexto suficiente, lo dice — no inventa.
 
-En términos simples: Mnē-MCP toma las notas que tengo en mi vault de Obsidian
-(y cualquier carpeta de documentos), las indexa en una base de datos vectorial
-llamada Qdrant, y cuando el asistente necesita responder una pregunta sobre mi
-propio conocimiento, primero **busca** en mis notas los fragmentos más
-relevantes y **luego** genera la respuesta basándose en ellos, citando la
-fuente exacta de cada afirmación.
+## 🧱 Cómo está hecho
 
-La diferencia con un asistente normal es clave: en vez de responder con
-conocimiento general (a veces desactualizado o inventado), el asistente
-responde **usando mis propios apuntes**, con la ruta del archivo que respalda
-cada parte de la respuesta. Esto elimina el problema de "alucinación" y
-convierte el vault de notas en una base de conocimiento aprovechable.
+```
+MCP tools (stdio) ──┐
+                    ├── RagService (core) ──────▶ Qdrant (vectorial, Docker)
+Admin page (:8310) ─┘      │
+                           ├── OllamaEmbedder (bge-m3 local)
+                           └── LLMProvider (deepseek-v4-flash)
+```
 
-## 2. ¿Qué es un MCP? (contexto)
+- **Python 3.14** · SDK MCP oficial (`mcp==1.12.4`) · `qdrant-client` · `httpx`
+- **7 tools**: `index` · `query` · `search` · `delete` · `list` · `stats` · `config`
+- **Admin page** local (`http://127.0.0.1:8310`): Dashboard, Documentos, Indexado asíncrono con progreso y playground de búsqueda — misma lógica que las tools MCP, cero duplicación
+- **70 tests** offline (Qdrant `:memory:` + mocks) + smoke end-to-end
 
-MCP (Model Context Protocol) es un estándar abierto que permite conectar
-asistentes de inteligencia artificial con herramientas y datos externos. Funciona
-como un "USB-C para la IA": en lugar de que cada asistente invente su propia
-forma de conectarse con bases de datos, archivos o servicios, MCP define un
-protocolo común sobre el cual cualquier asistente compatible puede usar
-cualquier herramienta compatible.
+## 🚀 Para el desarrollador
 
-En este proyecto, opencode (el asistente) actúa como "cliente" y Mnē-MCP como
-"servidor" de herramientas. El servidor se comunica con el asistente por
-stdin/stdout (protocolo stdio), y expone herramientas con nombre, parámetros
-y resultados tipados. Esto hace que el asistente pueda, de forma autónoma
-y en medio de una conversación, invocar acciones como "indexa mi vault" o
-"busca en mis notas X", igual que un humano usaría una herramienta.
+```bash
+docker compose up -d qdrant     # requisito 1: Qdrant
+ollama pull bge-m3              # requisito 2: embeddings locales
+cp .env.example .env            # OLLAMA_API_KEY + VAULT_ROOT
+make install                    # instala el server (venv)
+make admin                      # panel de control → http://127.0.0.1:8310
+```
 
-La razón por la que esto es valioso para el proyecto integrado es que
-demuestra no solo el uso de IA generativa, sino **la construcción de un
-sistema de IA completo y productivo** — con persistencia, recuperación,
-orquestación y una interfaz de uso real — en lugar de una demo de
-"copiar-pegar".
+**Registralo en `opencode.json`** (sección `mcp`) como comando local, y desde el asistente:
 
-## 3. Funcionalidades y justificación
+| Pedís | Qué pasa |
+|---|---|
+| `indexá mi vault` | Escanea, salta lo no modificado, sube vectores |
+| `¿cuándo configuré X? respondé con mis notas` | Recupera fragmentos → responde con **citas** (`path` + sección) |
+| `buscá en mis notas "hardware del poco x3"` | Hits crudos con `score` |
+| Una pregunta sin datos en el índice | Rechazo honesto: *"No se encontraron documentos relevantes"* |
 
-Mnē-MCP expone **7 herramientas** (cada una está justificada por un problema
-real que resuelve):
+## 🧠 Roadmap
 
-### `index` — Construir la base de conocimiento
-Escanea una carpeta (por defecto el vault de Obsidian), divide los documentos
-Markdown en fragmentos con contexto jerárquico (heading_path, tipo
-"Proyecto > Hardware > Setup"), genera los embeddings y los guarda en Qdrant.
-Es incremental: no vuelve a indexar lo que no cambió (compara fecha y hash),
-y limpia los documentos que ya no existen. Sin esta herramienta el resto del
-sistema no tiene de dónde recuperar.
+Búsqueda **híbrida** densa+dispersa (BM25 + RRF) · **cross-encoder rerank** · **caché semántica** · **eval harness** (recall@k / MRR / nDCG) — planificados en `openspec/specs/mnemos-differentiators/`.
 
-### `query` — La funcionalidad estrella (RAG completo)
-Recibe una pregunta en lenguaje natural, busca los fragmentos más similares
-en Qdrant, los pasa como contexto a un LLM (DeepSeek V4 Flash, en la nube
-de Ollama) y devuelve una respuesta **fundamentada**: cada afirmación
-acompañada de la ruta de la nota y la puntuación de relevancia. Si no hay
-fragmentos suficientemente relevantes, el sistema lo dice y **no** usa
-la respuesta: preferimos decir "no encontré" antes que inventar.
+## 🏛️ Académico
 
-### `search` — Recuperación pura sin LLM
-Igual que query pero sin generación de texto: devuelve la lista cruda de
-fragmentos con su score. Sirve para auditorías, debugging y para
-herramientas que solo necesitan recuperación (no generar texto).
-
-### `delete` — Control y privacidad
-Borra documentos del índice por ruta exacta o por fuente completa. Permite
-quitar información del índice sin tocar los archivos originales, necesario
-para corregir errores o respetar privacidad.
-
-### `list` — Transparencia
-Lista qué documentos hay indexados, cuántos fragmentos tiene cada uno y la
-fecha de último indexado. Sin esto, el sistema es una caja negra: no se sabe
-qué conoce.
-
-### `stats` — Salud del sistema
-Estado de Qdrant (cantidad de vectores, fuentes), estado de Ollama
-(embeddings), si la clave del LLM está configurada y la salud de la base.
-Es el "semáforo" del sistema: permite saber de un vistazo si todo
-funciona.
-
-### `config` — Configuración dinámica
-Lee y ajusta en caliente parámetros como el umbral de relevancia
-(score_threshold), el top_k (cuántos fragmentos se recuperan), el tamaño
-de los fragmentos y el overlap. Permite calibrar la calidad de las
-respuestas sin tocar código ni reiniciar el servidor.
-
-**Además, una página de administración local (http://127.0.0.1:8310)** que
-permite ver el estado del RAG, revisar los documentos indexados con
-búsqueda y paginación, disparar un indexado asíncrono con barra de progreso,
-borrar documentos y probar búsquedas semánticas desde un panel visual. Esta
-página responde el mismo núcleo lógico que las herramientas MCP (no hay
-lógica duplicada), y enlaza al dashboard nativo de Qdrant para explorar la
-base de datos vectorial en crudo.
-
-## 4. ¿Por qué sirve? (el problema que resuelve)
-
-1. **El conocimiento personal está disperso**: una vault de Obsidian con
-   cientos de notas no se puede buscar de forma semántica con herramientas
-   clásicas (grep). Mnē-MCP permite preguntarle al asistente cosas como
-   "¿cómo configuré el servidor?", incluso si las notas no comparten palabras
-   exactas con la pregunta — eso es justo lo que hacen los embeddings
-   semánticos.
-2. **Las respuestas están ancladas a la realidad**: al recuperar fragmentos
-   reales y citar la fuente, se reduce la "alucinación" típica de los LLM
-   (inventar respuestas). El sistema se negoca a responder cuando no
-   encuentra evidencia.
-3. **Privacidad y control de datos**: los embeddings (la conversión de texto
-   a vectores) se generan en local con Ollama — nunca salen de la máquina.
-   Solo el texto recuperado (y solo cuando el usuario pregunta) se envía al
-   LLM de nube.
-4. **Escalabilidad**: indexado incremental con md5/mtime, batches y retries
-   con backoff hacen que indexar 19 GB de notas sea un proceso reanudable y
-   acotado, no un monstruo de una sola vez.
-5. **Es un sistema real, no una demo**: tiene tests (70, 100% offline), un
-   script de humo, configuración por entorno y documento, y un contrato de
-   interfaz con el asistente (MCP) que es el estándar de la industria 2026.
-
-## 5. ¿Cómo funciona? (flujo de trabajo)
-
-El ciclo de vida tiene dos momentos:
-
-**1. Fase de indexado (construcción del conocimiento):**
-Mnē-MCP camina la carpeta raíz, filtra los archivos válidos (.md, .txt) y
-descarta los que superan un límite de tamaño. Por cada archivo, calcula la
-fecha de modificación: si no cambió desde el último indexado, lo saltea
-directamente (optimización incremental). Si cambió, divide el documento en
-fragmentos de ~800 tokens, respetando la jerarquía de encabezados Markdown
-y con un solapamiento de ~100 tokens para no cortar contexto. Cada fragmento
-se convierte en un vector de 1024 dimensiones con el modelo multilingüe
-bge-m3 vía Ollama local, se normaliza y se sube a Qdrant en lotes de 128
-con reintentos. Al finalizar, los fragmentos de documentos que ya no existen
-en disco se eliminan del índice (el "stale cleanup").
-
-**2. Fase de consulta (recuperación + generación):**
-La pregunta del usuario se convierte en vector con el mismo modelo. Se busca
-en Qdrant los k fragmentos más similares (por similitud coseno), filtrados
-opcionalmente por fuente (por ejemplo, solo notas de cierto proyecto) y con
-un umbral de relevancia configurable. Si los mejores resultados están por
-debajo del umbral, el sistema responde "No se encontraron documentos
-relevantes" y no gasta una llamada al LLM. Si hay resultados válidos, se
-construye un prompt que le dice al LLM (DeepSeek V4 Flash): "Responde
-SOLO usando este contexto y cita las rutas", con cada fragmento precedido
-de su ruta y jerarquía. El LLM responde, y el sistema empaqueta la
-respuesta con la lista de fuentes y el score de cada una.
-
-Tanto el indexado como la consulta son accesibles por dos vías idénticas:
-las herramientas MCP (para que el asistente las use autónomamente) y la
-página de administración (para que una persona lo controle visualmente).
-
-## 6. Stack tecnológico y justificación
-
-| Tecnología | Rol | ¿Por qué? |
-|---|---|---|
-| **Python 3.14** | Lenguaje del servidor | Ecosistema maduro para IA y librerías MCP oficiales |
-| **MCP SDK (`mcp`)** | Protocolo de comunicación | Estándar de la industria; opencode lo soporta nativamente |
-| **Qdrant (Docker)** | Base de datos vectorial | Especialista en búsqueda de similitud; rápido, con filtros por payload; corre local |
-| **Ollama local** | Embeddings bge-m3 | Multilingüe (clave para notas en español); 100% local, sin enviar datos |
-| **DeepSeek V4 Flash** | Generación de respuestas | LLM en la nube (Ollama Cloud); usa el contexto recuperado |
-| **Qdrant en memoria** | Testing | Permite suite de tests 100% offline y determinista |
-
-Decisión importante: los **embeddings son locales** porque Ollama Cloud (el
-servicio en la nube del mismo proveedor) **no expone un endpoint de
-embeddings** — se verificó experimentalmente. Y aunque lo hiciera, tener el
-indexado local es mejor para la privacidad. El LLM de generación sí es en la
-nube porque es donde está la calidad del modelo.
-
-## 7. Estado actual del proyecto
-
-- **Planificación**: completa, con metodología SDD (specs, diseño y tareas).
-- **Implementación**: 11/11 tareas — el servidor MCP, la página de
-  administración, el indexado incremental y los 7 herramientas están
-  implementadas y con **70 tests pasando, todos offline** (sin necesidad de
-  red ni de servicios reales).
-- **Validación real**: probado contra Qdrant real en Docker y Ollama real
-  (modelo bge-m3) con un subconjunto de notas del vault — indexado y
-  búsqueda funcionando; queda calibrar los scores en frío con el volumen
-  completo y registrar el servidor en el asistente.
-- **Pendiente**: indexado completo del vault (19 GB, proceso largo en CPU),
-  ajuste fino del umbral de relevancia, y memoria/entrega final del ramo.
-
-## 8. Uso en una frase
-
-"Le preguntás al asistente cualquier cosa sobre tu vida de proyectos,
-y te responde citando exactamente la nota de dónde lo sacó — o te dice que
-no lo tiene."
-
-## 9. Comparativa con proyectos similares
-
-Existen otros servidores MCP de RAG y búsqueda semántica. Esta sección
-documenta la comparación (investigación de agosto 2026) y qué hace a Mnē-MCP
-distinto.
-
-### Tabla comparativa
-
-| Proyecto | Stack | Tools | Embeddings | Indexado de disco | Admin UI | Generación con LLM |
-|---|---|---|---|---|---|---|
-| **Mnē-MCP (este proyecto)** | Python, FastMCP | 7 | bge-m3 local (Ollama) | Sí (incremental mtime+md5, 19 GB) | **Sí, completa (Dashboard/Documents/Index/Search)** | **Sí, con rechazo si no hay evidencia** |
-| ximot/knowledge-mcp | Python, FastMCP | 24 | nomic-embed-text | No (entradas manuales) | Parcial (stub) | No (solo recuperación) |
-| qdrant/mcp-server-qdrant (oficial) | Python, FastMCP | 2 | fastembed | No | No | No |
-| ancoleman/qdrant-rag-mcp | Python | ~40 | por tipo de contenido | Sí (mtime) | No | No (genera Claude) |
-| doitmagic/rag-code-mcp | Go | 9 | mxbai-embed-large | Sí (al primer query) | No | No |
-| weverkley/qdrant-mcp-server | Go | 1 | nomic-embed-text | Sí (fsnotify) | No | No |
-| w3-mcp-server-qdrant | Python | 2 | bge-m3 | No | No | No |
-| rageval-mcp | Python | 5 | — | No (carga corpus etiquetado) | No | No (eval-only) |
-
-### Qué diferencia a Mnē-MCP
-
-1. **Respuestas fundamentadas con rechazo**: Mnē-MCP genera la respuesta
-   **en el servidor** con un umbral de evidencia — si no hay fragmentos
-   suficientemente relevantes, **dice que no encontró** en vez de inventar.
-   Ninguno de los proyectos comparados genera respuestas del lado del
-   servidor: delegan la generación al cliente (el LLM del asistente).
-2. **Citas a nivel de fragmento con ruta de encabezados**: cada respuesta
-   viene acompañada de la ruta de la nota y la jerarquía de secciones
-   (heading_path), verificable en el vault.
-3. **Indexado incremental de carpetas reales**: escanea el vault desde
-   disco con mtime+md5, stale cleanup y manejo de volúmenes grandes (19 GB),
-   sin requerir entrada manual de documentos.
-4. **Página de administración local**: control visual del RAG (estado,
-   documentos, indexado asíncrono, playground de búsqueda) que ninguno de
-   los competidores ofrece de forma completa.
-5. **Umbral de relevancia configurable en caliente**: ajuste de calidad de
-   respuestas sin tocar código (score_threshold, top_k).
-
-**En desarrollo (features planificadas)**: búsqueda híbrida densa+dispersa
-(BM25 + fusión RRF), cross-encoder reranking, caché semántica y harness de
-evaluación de recuperación integrado (recall@k / MRR / nDCG).
-
----
-
-*Proyecto académico — Proyecto Integrado con Prof. Christian Pérez. Repositorio:
-`~/proyectos_github/mcp-rag-opencode`.*
+**Proyecto Integrado** · Prof. **Christian Pérez** · Alumno: Gat · 2026 · [Repo](https://github.com/Gatoco/mnemos-mcp)
